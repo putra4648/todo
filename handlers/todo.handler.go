@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"putra4648/todo/db"
+	"putra4648/todo/middleware"
 	"putra4648/todo/models"
 	"strconv"
 
@@ -14,13 +15,13 @@ func GetTodosHandler(q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.Error(middleware.NewAppError(401, "Unauthorized"))
 			return
 		}
 
 		todos, err := q.GetTodosByUserID(c.Request.Context(), userID.(int32))
 		if err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(500, err.Error()))
 			return
 		}
 
@@ -43,13 +44,13 @@ func CreateTodoHandler(q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.Error(middleware.NewAppError(401, "Unauthorized"))
 			return
 		}
 
 		var req models.TodoDto
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(400, err.Error()))
 			return
 		}
 
@@ -67,20 +68,20 @@ func UpdateTodoHandler(q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.Error(middleware.NewAppError(401, "Unauthorized"))
 			return
 		}
 
 		idParam := c.Param("id")
 		parseId, err := strconv.Atoi(idParam)
 		if err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(400, "Invalid ID format"))
 			return
 		}
 
 		var req models.TodoDto
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(400, err.Error()))
 			return
 		}
 
@@ -93,7 +94,7 @@ func UpdateTodoHandler(q *db.Queries) gin.HandlerFunc {
 		})
 
 		if err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(500, err.Error()))
 			return
 		}
 
@@ -105,7 +106,7 @@ func DeleteTodoHandler(q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.Error(middleware.NewAppError(401, "Unauthorized"))
 			return
 		}
 
@@ -113,7 +114,7 @@ func DeleteTodoHandler(q *db.Queries) gin.HandlerFunc {
 
 		parseId, err := strconv.Atoi(id)
 		if err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(400, "Invalid ID format"))
 			return
 		}
 		q.DeleteTodo(c.Request.Context(), db.DeleteTodoParams{

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"putra4648/todo/db"
 	"putra4648/todo/handlers"
 	"putra4648/todo/middleware"
@@ -25,7 +26,7 @@ func main() {
 	app.Use(middleware.Error())
 	app.Use(middleware.Auth())
 
-	// app.LoadHTMLGlob("templates/**/*")
+	app.LoadHTMLGlob("templates/*.html")
 
 	ctx := context.Background()
 
@@ -37,6 +38,29 @@ func main() {
 
 	db := db.New(conn)
 
+	// View Routes
+	app.GET("/", func(c *gin.Context) {
+		isLoggedIn, _ := c.Get("is_logged_in")
+		c.HTML(http.StatusOK, "todos.html", gin.H{
+			"is_logged_in": isLoggedIn,
+		})
+	})
+	app.GET("/login", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "login.html", gin.H{
+			"title": "Login",
+		})
+	})
+	app.GET("/register", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "register.html", gin.H{
+			"title": "Register",
+		})
+	})
+	app.GET("/logout", func(c *gin.Context) {
+		c.SetCookie("token", "", -1, "/", "", false, true)
+		c.Redirect(http.StatusSeeOther, "/login")
+	})
+
+	// API Routes
 	auth := app.Group("/auth")
 	auth.POST("/register", handlers.RegisterHandler(db))
 	auth.POST("/login", handlers.LoginHandler(db))

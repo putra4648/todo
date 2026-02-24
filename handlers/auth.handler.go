@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 	"os"
 	"putra4648/todo/db"
+	"putra4648/todo/middleware"
 	"putra4648/todo/models"
 	"putra4648/todo/utils"
 	"time"
@@ -17,13 +17,13 @@ func RegisterHandler(q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req models.AuthRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(400, err.Error()))
 			return
 		}
 		pw, err := utils.HashPassword(req.Password)
 
 		if err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(500, err.Error()))
 			return
 		}
 
@@ -40,18 +40,18 @@ func LoginHandler(q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req models.AuthRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(400, err.Error()))
 			return
 		}
 
 		user, err := q.GetUserByName(c.Request.Context(), req.Username)
 		if err != nil {
-			c.Error(errors.New("User not found"))
+			c.Error(middleware.NewAppError(404, "User not found"))
 			return
 		}
 
 		if utils.VerifyPassword(req.Password, user.Password) != nil {
-			c.Error(errors.New("Password not match"))
+			c.Error(middleware.NewAppError(401, "Password not match"))
 			return
 		}
 
@@ -61,7 +61,7 @@ func LoginHandler(q *db.Queries) gin.HandlerFunc {
 		}).SignedString([]byte(os.Getenv("JWT_SECRET")))
 
 		if err != nil {
-			c.Error(err)
+			c.Error(middleware.NewAppError(500, err.Error()))
 			return
 		}
 

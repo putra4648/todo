@@ -1,0 +1,149 @@
+{{ template "header.html" . }}
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card p-4">
+            <h4 class="mb-4">Create New Todo</h4>
+            <form id="createForm" class="row g-3">
+                <div class="col-md-8">
+                    <input type="text" class="form-control" name="title" placeholder="What needs to be done?" required>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">Add Todo</button>
+                </div>
+                <div class="col-12 mt-2">
+                    <textarea class="form-control" name="description" rows="1" placeholder="Optional description"></textarea>
+                </div>
+            </form>
+        </div>
+
+        <div class="mt-4">
+            <h4 class="mb-3">My Tasks</h4>
+            <div id="todoList" class="list-group">
+                <div class="text-center p-5 text-muted">Loading tasks...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Todo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" name="id">
+                    <div class="mb-3">
+                        <label class="form-label">Title</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description"></textarea>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_done" id="editIsDone">
+                        <label class="form-check-label" for="editIsDone">Completed</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const todoList = document.getElementById('todoList');
+        const createForm = document.getElementById('createForm');
+        const editForm = document.getElementById('editForm');
+        const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+
+        async function loadTodos() {
+            const response = await fetch('/todos');
+            if (!response.ok) {
+                if (response.status === 401) window.location.href = '/login';
+                return;
+            }
+            const todos = await response.json();
+            
+            if (todos.length === 0) {
+                todoList.innerHTML = '<div class="text-center p-5 text-muted">No tasks found. Start by adding one above!</div>';
+                return;
+            }
+
+            todoList.innerHTML = todos.map(todo => `
+                <div class="list-group-item d-flex justify-content-between align-items-center rounded-3 mb-2 border shadow-sm p-3">
+                    <div class="flex-grow-1">
+                        <h5 class="${todo.is_done ? 'text-decoration-line-through text-muted' : ''} mb-1">${todo.title}</h5>
+                        <p class="small text-muted mb-0">${todo.description || 'No description'}</p>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-info" onclick="openEditModal(${JSON.stringify(todo).replace(/"/g, '&quot;')})">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteTodo(${todo.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        createForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(createForm);
+            const data = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                is_done: false
+            };
+            const response = await fetch('/todos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                createForm.reset();
+                loadTodos();
+            }
+        });
+
+        window.deleteTodo = async function(id) {
+            if (!confirm('Are you sure?')) return;
+            const response = await fetch(`/todos/${id}`, { method: 'DELETE' });
+            if (response.ok) loadTodos();
+        }
+
+        window.openEditModal = function(todo) {
+            editForm.id.value = todo.id;
+            editForm.title.value = todo.title;
+            editForm.description.value = todo.description;
+            editForm.is_done.checked = todo.is_done;
+            editModal.show();
+        }
+
+        editForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = editForm.id.value;
+            const data = {
+                title: editForm.title.value,
+                description: editForm.description.value,
+                is_done: editForm.is_done.checked
+            };
+            const response = await fetch(`/todos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                editModal.hide();
+                loadTodos();
+            }
+        });
+
+        loadTodos();
+    });
+</script>
+
+{{ template "footer.html" . }}
