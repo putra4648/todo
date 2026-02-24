@@ -11,6 +11,10 @@ func Error() gin.HandlerFunc {
 		c.Next()
 
 		if len(c.Errors) > 0 {
+			if c.Writer.Written() {
+				return
+			}
+
 			// Step3: Use the last error
 			err := c.Errors.Last().Err
 

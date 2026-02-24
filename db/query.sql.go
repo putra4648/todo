@@ -11,21 +11,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createTodo = `-- name: CreateTodo :one
-INSERT INTO todos (title, description, completed) VALUES ($1, $2, $3) RETURNING id
+const createTodoWithUser = `-- name: CreateTodoWithUser :one
+WITH inserted_todo AS (
+    INSERT INTO todos (title, description, completed) VALUES ($1, $2, $3) RETURNING id
+)
+INSERT INTO user_todos (user_id, todo_id)
+SELECT $4, id FROM inserted_todo
+RETURNING todo_id
 `
 
-type CreateTodoParams struct {
+type CreateTodoWithUserParams struct {
 	Title       string
 	Description pgtype.Text
 	Completed   pgtype.Bool
+	UserID      int32
 }
 
-func (q *Queries) CreateTodo(ctx context.Context, arg CreateTodoParams) (int32, error) {
-	row := q.db.QueryRow(ctx, createTodo, arg.Title, arg.Description, arg.Completed)
-	var id int32
-	err := row.Scan(&id)
-	return id, err
+func (q *Queries) CreateTodoWithUser(ctx context.Context, arg CreateTodoWithUserParams) (int32, error) {
+	row := q.db.QueryRow(ctx, createTodoWithUser,
+		arg.Title,
+		arg.Description,
+		arg.Completed,
+		arg.UserID,
+	)
+	var todo_id int32
+	err := row.Scan(&todo_id)
+	return todo_id, err
 }
 
 const createUser = `-- name: CreateUser :one
@@ -62,11 +73,19 @@ func (q *Queries) CreateUserTodo(ctx context.Context, arg CreateUserTodoParams) 
 }
 
 const deleteTodo = `-- name: DeleteTodo :one
-DELETE FROM todos WHERE id = $1 RETURNING id
+DELETE FROM todos
+WHERE id = $1 AND id IN (SELECT todo_id FROM user_todos WHERE user_id = $2)
+RETURNING id
 `
 
-func (q *Queries) DeleteTodo(ctx context.Context, id int32) (int32, error) {
-	row := q.db.QueryRow(ctx, deleteTodo, id)
+type DeleteTodoParams struct {
+	ID     int32
+	UserID int32
+}
+
+func (q *Queries) DeleteTodo(ctx context.Context, arg DeleteTodoParams) (int32, error) {
+	row := q.db.QueryRow(ctx, deleteTodo, arg.ID, arg.UserID)
+	var id int32
 	err := row.Scan(&id)
 	return id, err
 }
@@ -129,12 +148,14 @@ func (q *Queries) GetTodoUsers(ctx context.Context, todoID int32) ([]UserTodo, e
 	return items, nil
 }
 
-const getTodos = `-- name: GetTodos :many
-SELECT id, title, description, completed, created_at, updated_at FROM todos
+const getTodosByUserID = `-- name: GetTodosByUserID :many
+SELECT t.id, t.title, t.description, t.completed, t.created_at, t.updated_at FROM todos t
+JOIN user_todos ut ON t.id = ut.todo_id
+WHERE ut.user_id = $1
 `
 
-func (q *Queries) GetTodos(ctx context.Context) ([]Todo, error) {
-	rows, err := q.db.Query(ctx, getTodos)
+func (q *Queries) GetTodosByUserID(ctx context.Context, userID int32) ([]Todo, error) {
+	rows, err := q.db.Query(ctx, getTodosByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +270,10 @@ func (q *Queries) GetUserTodos(ctx context.Context, userID int32) ([]UserTodo, e
 }
 
 const updateTodo = `-- name: UpdateTodo :one
-UPDATE todos SET title = $1, description = $2, completed = $3 WHERE id = $4 RETURNING id
+UPDATE todos
+SET title = $1, description = $2, completed = $3
+WHERE id = $4 AND id IN (SELECT todo_id FROM user_todos WHERE user_id = $5)
+RETURNING id
 `
 
 type UpdateTodoParams struct {
@@ -257,6 +281,7 @@ type UpdateTodoParams struct {
 	Description pgtype.Text
 	Completed   pgtype.Bool
 	ID          int32
+	UserID      int32
 }
 
 func (q *Queries) UpdateTodo(ctx context.Context, arg UpdateTodoParams) (int32, error) {
@@ -265,6 +290,7 @@ func (q *Queries) UpdateTodo(ctx context.Context, arg UpdateTodoParams) (int32, 
 		arg.Description,
 		arg.Completed,
 		arg.ID,
+		arg.UserID,
 	)
 	var id int32
 	err := row.Scan(&id)

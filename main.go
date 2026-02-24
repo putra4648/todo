@@ -42,6 +42,9 @@ func main() {
 	auth.POST("/login", handlers.LoginHandler(db))
 
 	app.GET("/todos", handlers.GetTodosHandler(db))
+	app.POST("/todos", handlers.CreateTodoHandler(db))
+	app.PUT("/todos/:id", handlers.UpdateTodoHandler(db))
+	app.DELETE("/todos/:id", handlers.DeleteTodoHandler(db))
 
 	app.Run(":8080")
 }

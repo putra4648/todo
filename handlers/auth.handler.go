@@ -15,7 +15,7 @@ import (
 
 func RegisterHandler(q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req models.RegisterRequest
+		var req models.AuthRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.Error(err)
 			return
@@ -38,7 +38,7 @@ func RegisterHandler(q *db.Queries) gin.HandlerFunc {
 
 func LoginHandler(q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req models.LoginRequest
+		var req models.AuthRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.Error(err)
 			return
@@ -66,6 +66,9 @@ func LoginHandler(q *db.Queries) gin.HandlerFunc {
 		}
 
 		c.SetCookie("token", token, 60*60*24*7, "/", "", false, true)
-		c.JSON(http.StatusOK, gin.H{"message": "User logged in successfully"})
+		c.JSON(http.StatusOK, gin.H{
+			"message": "User logged in successfully",
+			"token":   token,
+		})
 	}
 }
